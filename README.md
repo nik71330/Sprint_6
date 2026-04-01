@@ -10,4 +10,4 @@ pytest --alluredir=allure-results
 allure serve allure-results
 
 ## Браузер
-Тесты запускаются в Mozilla Firefox
+Тесты запускаются в Mozilla Firefox# Sprint_6
