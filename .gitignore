@@ -1,6 +1,0 @@
-cat > .gitignore <<'EOF'
-__pycache__/
-*.pyc
-allure-results/
-__MACOSX/
-EOF
