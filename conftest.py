@@ -1,16 +1,13 @@
 import pytest
-from dotenv import load_dotenv
 from selenium import webdriver
 
 from pages.home_page import HomePage
 from pages.order_page import OrderPage
 
-load_dotenv()
-
 
 @pytest.fixture
 def driver():
-    driver = webdriver.Chrome()
+    driver = webdriver.Firefox()
     yield driver
     driver.quit()
 

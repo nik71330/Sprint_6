@@ -1,77 +1,73 @@
-import os
-from typing import Optional
-
-from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
-from selenium.webdriver.support import expected_conditions
-from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
 
 
 class BasePage:
-    def __init__(self, driver, base_url: Optional[str] = None, timeout: Optional[int] = None):
+    def __init__(self, driver, base_url="https://qa-scooter.praktikum-services.ru"):
         self.driver = driver
-        self.base_url = base_url or os.getenv("BASE_URL", "").rstrip("/")
-        if not self.base_url:
-            raise RuntimeError("BASE_URL is not set. Provide it via .env or constructor.")
-        self.timeout = int(timeout or os.getenv("DEFAULT_WAIT"))
-        self.wait = WebDriverWait(self.driver, self.timeout)
+        self.wait = WebDriverWait(driver, 15)
+        self.base_url = base_url
 
-    def open(self):
-        self.driver.get(self.base_url)
+    def wait_for_visible(self, locator):
+        return self.wait.until(EC.visibility_of_element_located(locator))
 
-    def presence(self, locator):
-        return self.wait.until(
-            expected_conditions.presence_of_element_located(locator)
-        )
+    def wait_for_clickable(self, locator):
+        return self.wait.until(EC.element_to_be_clickable(locator))
 
-    def clickable(self, locator):
-        return self.wait.until(
-            expected_conditions.element_to_be_clickable(locator)
-        )
-
-    def click(self, locator):
-        for _ in range(3):
-            try:
-                # получаем свежий элемент и ждём кликабельности
-                btn = self.clickable(locator)
-                btn.click()
-                return
-            except StaleElementReferenceException:
-                # пробуем заново получить элемент
-                continue
-        # последний шанс: свежий элемент + JS-клик
-        btn = self.presence(locator)
-        self.driver.execute_script("arguments[0].click();", btn)
-        return self
+    def open(self, url=None):
+        self.driver.get(url or self.base_url)
 
     def get_current_url(self):
         return self.driver.current_url
 
-    def send_keys(self, locator, value: str):
+    def get_text(self, locator):
+        return self.wait_for_visible(locator).text
+
+    def scroll_to_element(self, locator):
         element = self.wait_for_visible(locator)
+        self.driver.execute_script(
+            "arguments[0].scrollIntoView({block: 'center'});",
+            element
+        )
+        return element
+
+    def click(self, locator):
+        self.scroll_to_element(locator)
+        self.wait_for_clickable(locator).click()
+
+    def send_keys(self, locator, value):
+        element = self.wait_for_clickable(locator)
+        element.clear()
         element.send_keys(value)
-        return self
-
-    def wait_for_visible(self, locator):
-        return self.wait.until(expected_conditions.visibility_of_element_located(locator))
-
-    def wait_for_url(self, url):
-        try:
-            return self.wait.until(expected_conditions.url_to_be(url))
-        except TimeoutException:
-            return False
-
-    def wait_for_url_contains(self, substring):
-        try:
-            return self.wait.until(expected_conditions.url_contains(substring))
-        except TimeoutException:
-            return False
 
     def switch_to_new_window(self):
-        handles = self.driver.window_handles
-        if len(handles) > 1:
-            self.driver.switch_to.window(handles[1])
-            return True
-        return False
+        self.wait.until(lambda d: len(d.window_handles) > 1)
+        self.driver.switch_to.window(self.driver.window_handles[-1])
+        self.wait.until(lambda d: d.current_url != "about:blank")
+        return True
 
-    def get_text(self, root, locator) -> str:
-        return root.find_element(*locator).text.strip()
+    def click_if_present(self, locator, timeout=5):
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                EC.element_to_be_clickable(locator)
+            ).click()
+            return True
+        except TimeoutException:
+            return False
+
+    def click_faq(self, locator):
+        element = self.wait_for_visible(locator)
+        self.driver.execute_script(
+            "arguments[0].scrollIntoView({block: 'center'});",
+            element
+        )
+
+        width = element.size["width"]
+        x_offset = -(width // 2) + 20
+
+        ActionChains(self.driver) \
+            .move_to_element_with_offset(element, x_offset, 0) \
+            .click() \
+            .perform()
